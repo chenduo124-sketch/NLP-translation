@@ -15,10 +15,14 @@ class RoPE(nn.Module):
         self.register_buffer("freqs", freqs)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: 输入形状[seq_len, batch_size, d_model]
+        # x: [50, 16, 128]->这是50行（词）、16批次、128维度数据
+        # 得到了50，也就是每行句子的token数
         seq_len = x.shape[0]
+        # 创建一个从0开始的等差数列：0、1、2、3、4 . . . 49 并且是浮点型方便计算cos
         pos = torch.arange(seq_len, device=x.device).float()
-        freqs = torch.outer(pos, self.freqs)  # [seq_len, half]
+        # 给词贴上 pos编号（坐标）从而算出每个词应该旋转的角度。
+        # 比如位置是向量1、2维度那么位置=0，0*0.5频率=0。位置是向量3、4维度那么位置=1，1*0.4频率=0.4
+        freqs = torch.outer(pos, self.freqs)  # [50, 64]
         cos = torch.cos(freqs)
         sin = torch.sin(freqs)
 
@@ -42,7 +46,7 @@ class Translation(nn.Module):
         num_decoder_layers: int = 3,  # 解码器堆叠层数
         dim_feedforward: int = 512,   # FFN中间层维度
         dropout: float = 0.1,
-        pad_token_id: int = 0   # <pad> 的id，你词表里固定是0
+        pad_token_id: int = 0   # <pad> 的id，词表里固定是0
     ):
         super().__init__()
         self.d_model = d_model
@@ -50,7 +54,9 @@ class Translation(nn.Module):
 
         # ========== 嵌入层 Embedding ==========
         # 【作用】把数字ID映射为稠密向量，让模型能理解词语语义
-        # 【乘sqrt(d_model)原因】平衡词向量与位置编码数值尺度，训练更稳定
+        # nn.Embedding 会创建一个形状为 [vocab_size, d_model] 的矩阵。
+        # 比如：105，它会取出矩阵中第 105 行的那一串长为 128 的浮点数。
+        # 最后进行位置旋转编码
         self.src_embedding = nn.Embedding(src_vocab_size, d_model)
         self.tgt_embedding = nn.Embedding(tgt_vocab_size, d_model)
         self.pos_encoder = RoPE(d_model)
@@ -75,7 +81,7 @@ class Translation(nn.Module):
 
     # ========== 生成Padding掩码：屏蔽<pad>，不让注意力看到填充符 ==========
     def generate_padding_mask(self, seq: torch.Tensor) -> torch.Tensor:
-        # seq: [seq_len, batch]
+        # seq: [seq_len, batch] 就是将数据的id与pid的0做对比，得到True False然后返回
         # True = 遮蔽位置，False = 可见
         return seq == self.pad_token_id
 
@@ -89,7 +95,7 @@ class Translation(nn.Module):
     def forward(self, src_ids: torch.Tensor, tgt_ids: torch.Tensor):
         """
         训练阶段前向传播
-        :param src_ids: 英文输入ID [src_seq_len, batch_size]
+        :param src_ids: 英文输入ID [src_seq_len-列, batch_size-行] 就是5行10列，5个句子每句10个字。
         :param tgt_ids: 中文输入ID [tgt_seq_len, batch_size]
         :return: 每个位置所有中文词概率分数 [tgt_seq_len, batch, tgt_vocab_size]
         """
@@ -105,7 +111,9 @@ class Translation(nn.Module):
         tgt_emb = self.pos_encoder(tgt_emb)
 
         # 3. 构造各类掩码 + 关键：转置padding mask
+        # 根据输入的形状，提前准备掩码：1、对于句子补0的掩码。2解码器的掩码自注意力机制的Q*K后进行掩码
         src_pad_mask = self.generate_padding_mask(src_ids).T
+        # 解码器也要补0：["<SOS>", "I", "love", "you", "<EOS>", "<PAD>", "<PAD>"]
         tgt_pad_mask = self.generate_padding_mask(tgt_ids).T
         tgt_mask = self.generate_tgt_mask(tgt_seq_len).to(src_ids.device)
 
@@ -117,7 +125,7 @@ class Translation(nn.Module):
             tgt_mask=tgt_mask,
             src_key_padding_mask=src_pad_mask,
             tgt_key_padding_mask=tgt_pad_mask,
-            memory_key_padding_mask=src_pad_mask
+            memory_key_padding_mask=src_pad_mask # 在编码掩码自注意力机制中，解码的Q和编码结果进行KV计算时，也需要屏蔽PAD的KV
         )
 
         # 5. 映射到词表维度输出分数
@@ -129,6 +137,8 @@ if __name__ == "__main__":
     model = Translation(src_vocab_size=1000, tgt_vocab_size=1000, d_model=128, nhead=4)
     batch = 4
     src = torch.randint(0, 1000, (30, batch))  # [seq=30, batch=4]
+    print(src.shape)
     tgt = torch.randint(0, 1000, (35, batch))
+    print(tgt.shape)
     out = model(src, tgt)
     print("输出shape:", out.shape)  # [35, 4, 1000]

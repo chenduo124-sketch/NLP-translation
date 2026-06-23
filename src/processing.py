@@ -82,6 +82,6 @@ def words2json(words, vocab_path):
 
 if __name__ == '__main__':
     words = txt2list(TRAIN_DATA)
-    en_all_words, zh_all_words = list2token(words)
+    zh_all_words, en_all_words = list2token(words)
     words2json(en_all_words, EN_VOCAB_PATH)
     words2json(zh_all_words, ZH_VOCAB_PATH)
