@@ -90,7 +90,7 @@ def train(model, train_loader, val_loader, optimizer, criterion, device):
             pbar.set_postfix({'loss': f'{loss.item():.4f}'})
 
             # 记录到 TensorBoard
-            writer.add_scalar("Loss/Train", loss.item(), global_step)
+            writer.add_scalar(Train_LOG, float(avg_val_loss), epoch)
         # --- 验证阶段 ---
         model.eval()    # 冻结所有参数，进入推理阶段
         val_loss = 0
