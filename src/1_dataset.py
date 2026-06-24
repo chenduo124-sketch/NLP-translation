@@ -50,3 +50,13 @@ class Vocab:
         # 过滤掉特殊标记，只保留正常文字
         real_words = [w for w in words if w not in ALL_TOKENS]
         return " ".join(real_words)
+
+
+if __name__ == '__main__':
+    zh_vocab = Vocab(ZH_VOCAB_PATH)
+    print(zh_vocab.word_to_id("你好"))
+    print(zh_vocab.id_to_word(520))
+    # 翻译成词会过滤掉特殊字符
+    print(zh_vocab.ids_to_sent([1,2,3,4,5,6,7,8]))
+    # 翻译成id会添加过滤字符
+    print(zh_vocab.sent_to_ids(["你好","有罪","弄清楚","完美"]))

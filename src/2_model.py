@@ -45,7 +45,7 @@ class Translation(nn.Module):
         num_encoder_layers: int = 3,  # 编码器堆叠层数
         num_decoder_layers: int = 3,  # 解码器堆叠层数
         dim_feedforward: int = 512,   # FFN中间层维度
-        dropout: float = 0.1,
+        dropout: float = 0.1,   # 使网络失活，避免过拟合
         pad_token_id: int = 0   # <pad> 的id，词表里固定是0
     ):
         super().__init__()
@@ -136,9 +136,11 @@ class Translation(nn.Module):
 if __name__ == "__main__":
     model = Translation(src_vocab_size=1000, tgt_vocab_size=1000, d_model=128, nhead=4)
     batch = 4
+    # 生成30行4列的4句句子，用来给到模型变量。
     src = torch.randint(0, 1000, (30, batch))  # [seq=30, batch=4]
     print(src.shape)
     tgt = torch.randint(0, 1000, (35, batch))
     print(tgt.shape)
+    # nn.Module有个类方法__call__，这个方法支持通过类对象调用call函数。作用是：1、挂钩子、分布式计算、兼容
     out = model(src, tgt)
-    print("输出shape:", out.shape)  # [35, 4, 1000]
+    print("输出shape:", out)  # [35, 4, 1000]
