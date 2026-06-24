@@ -14,6 +14,9 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torch.nn.utils.rnn import pad_sequence
 from config import *
 
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter # 1. 导入 TensorBoard
+
 
 # --- 1. 数据集加载器 ---
 class TranslationDataset(Dataset):
@@ -50,15 +53,19 @@ def collate_fn(batch):
 
 # --- 2. 训练循环 ---
 def train(model, train_loader, val_loader, optimizer, criterion, device):
+    writer = SummaryWriter(Train_LOG)  # 2. 创建日志记录器
     best_val_loss = float('inf')  # 用于保存最佳模型
     patience = 5  # 耐心值
     no_improve_epochs = 0  # 记录验证集未下降的次数
+    global_step = 0  # 用于记录全局步数，曲线才平滑
 
     for epoch in range(EPOCHS):
         start_time = time.time()  # 2. 记录每个 Epoch 开始的时间
         model.train()  # 开启训练
         total_loss = 0  # 记录本轮总 Loss，用来算平均值
 
+        # 3. 使用 tqdm 包裹 DataLoader
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{EPOCHS}")
         # 从 train_loader 里一批一批拿数据，然后放入cpu，
         for i, (src, tgt) in enumerate(train_loader):
             src, tgt = src.to(device), tgt.to(device)
@@ -79,10 +86,15 @@ def train(model, train_loader, val_loader, optimizer, criterion, device):
             total_loss += loss.item()
             if i % 100 == 0:
                 print(f"Epoch {epoch + 1} | Batch {i} | Loss: {loss.item():.4f}")
+            # 更新进度条描述
+            pbar.set_postfix({'loss': f'{loss.item():.4f}'})
 
+            # 记录到 TensorBoard
+            writer.add_scalar("Loss/Train", loss.item(), global_step)
         # --- 验证阶段 ---
         model.eval()    # 冻结所有参数，进入推理阶段
-        val_loss = 0    # 
+        val_loss = 0
+        # 在此块中不计算梯度，减少内存占用，加快计算速度
         with torch.no_grad():
             for src, tgt in val_loader:
                 src, tgt = src.to(device), tgt.to(device)
@@ -90,8 +102,10 @@ def train(model, train_loader, val_loader, optimizer, criterion, device):
                 output = model(src, tgt_input)
                 val_loss += criterion(output.view(-1, output.shape[-1]), tgt_out.reshape(-1)).item()
 
-        avg_val_loss = val_loss / len(val_loader)
-        avg_train_loss = total_loss / len(train_loader)
+        avg_val_loss = val_loss / len(val_loader)   # 计算本轮验证集的平均 Loss。
+        avg_train_loss = total_loss / len(train_loader) # # 计算本轮训练集的平均 Loss。
+        # 记录验证 Loss 到 TensorBoard
+        writer.add_scalar(Train_LOG, avg_val_loss, epoch)
         # 3. 计算并格式化耗时
         end_time = time.time()
         epoch_mins, epoch_secs = divmod(int(end_time - start_time), 60)

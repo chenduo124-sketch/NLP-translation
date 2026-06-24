@@ -37,7 +37,7 @@ ZH_VOCAB_PATH = MODELS_DIR / "zh_vocab.json"
 EN_VOCAB_PATH = MODELS_DIR / "en_vocab.json"
 VAL_PATH = MODELS_DIR / "val_indices.json"
 MODEL_WEIGHTS = MODELS_DIR / "transformer_model.pth"
-
+Train_LOG = LOGS_DIR / "runs" / "translation_experiment"
 
 # 4. --- CPU 训练优化版超参数 ---
 MAX_LEN = 50           # 句子最长度，缺少的补PAD，多的剪切（实际上已经不用了）
@@ -49,5 +49,5 @@ DIM_FEEDFORWARD = 512  # 前馈网络中间层维度：通常设为 D_MODEL 的 
 
 # 5. 训练控制
 BATCH_SIZE = 16         # 适合 CPU 处理的小批次，避免单次运算耗时过长
-EPOCHS = 10             # 较小的模型需要多跑几轮来收敛 40
-LEARNING_RATE = 0.0005  # 学习率，适用于Adam进行反向传播。新参数 = 旧参数 - （学习率 * 梯度）
+EPOCHS = 60             # 较小的模型需要多跑几轮来收敛 40
+LEARNING_RATE = 0.0001  # 学习率，适用于Adam进行反向传播。新参数 = 旧参数 - （学习率 * 梯度）
